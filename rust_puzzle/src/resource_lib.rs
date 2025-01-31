@@ -59,3 +59,82 @@ fn read_field<'de, M, V>(buffer: &mut Option<V>, map: &mut M, field_name: &'stat
                 Ok(())
             }
 }
+
+impl<'de> Deserialize<'de> for SudokuGrid {
+    fn deserialize<D>(deserializer: D) -> Result<SudokuGrid, D::Error>
+    where
+        D: Deserializer<'de>{
+            #[derive(Deserialize)]
+            #[serde(field_identifier, rename_all = "snake_case")]
+            enum Field {
+                BlockWidth,
+                BlockHeight,
+                Cells
+            }
+
+            const BLOCK_WIDTH_NAME: &str = "block_width";
+            const BLOCK_HEIGHT_NAME: &str = "block_height";
+            const CELLS_NAME: &str = "cells";
+
+            struct SudokuGridVisitor;
+
+            impl<'de> Visitor<'de> for SudokuGridVisitor{
+                type Value = SudokuGrid;
+
+                fn expecting(&self, f: &mut formatter) -> fmt::Result{
+                    write!(f, "struct SudokuGrid")
+                }
+
+                fn visit_seq<V>(self, mut seq: V) -> Result<SudokuGrid, V::Error> where V: SeqAccess<'de>
+                {
+                    let block_width = seq.next_element()?
+                        .ok_or_else(|| de:Error::invalid_length(0, &self))?;
+                    let block_height = seq.next_element()?
+                        .ok_or_else(|| de:Error::invalid_length(1, &self))?;
+                    let cells = seq.next_element()?
+                        .ok_or_else(|| de::Error:invalid_length(2, &self))?;
+                    build_sudoku_grid(block_width, block_height, cells)
+                }
+
+                fn visit_map<V>(self, mut map: V) -> Result<SudokuGrid, V::Error> where V: MapAccess<'de>
+                {
+                    let mut block_width = None;
+                    let mut block_height = None;
+                    let mut cells = None;
+
+                    while let Some(key) = map.next_key()?{
+                        match key {
+                            Field::BlockWidth =>
+                                read_field(&mut block_width, &mut map, BLOCK_WIDTH_NAME)?,
+                            Field::BlockHeight =>
+                                read_field(&mut block_height, &mut map, BLOCK_HEIGHT_NAME)?,
+                            Field::Cells =>
+                                read_field(&mut cells, &mut map, CELLS_NAME)?;
+                        }
+                    }
+
+                    let block_width = block_width.ok_or_else(|| de::Error::missing_field(BLOCK_WIDTH_NAME))?;
+                    let block_height = block_height.ok_or_else(|| de::Error::missing_field(BLOCK_HEIGHT_NAME))?;
+                    let cells = cells.ok_or_else(|| de::Error::missing_field(CELLS_NAME))?;
+                    build_sudoku_grid(block_width, block_height, cells)
+                }
+            }
+
+            const FIELDS: &[&str] = &[
+                BLOCK_WIDTH_NAME,
+                BLOCK_HEIGHT_NAME,
+                CELLS_NAME
+            ];
+            deserializer.deserialize_struct("SudokuGrid", FIELDS, SudokuGridVisitor)
+        }
+}
+
+fn to_char(cell: Option<usize>) -> char {
+    if let Some(n) = cell {
+        (b'0' + n as u8) as char
+    }
+    else {
+        ' '
+    }
+}
+
