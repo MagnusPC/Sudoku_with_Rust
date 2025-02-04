@@ -138,3 +138,114 @@ fn to_char(cell: Option<usize>) -> char {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn line(grid: &SudokuGrid, start: char, thick_sep: char, thin_sep: char, segment: impl Fn(usize) -> char, pad: char, end: char, newline: bool) -> String {
+    let size = grid.size();
+    let mut result = String::new();
+
+    for x in 0..size {
+        if x == 0 {
+            result.push(start);
+        }
+        else if x % grid.block_width == 0 {
+            result.push(thick_sep);
+        }
+        else {
+            result.push(thin_sep)
+        }
+
+        result.push(pad);
+        result.push(segment(x));
+        result.push(pad);
+    }
+
+    result.push(end);
+
+    if newline {
+        result.push('\n');
+    }
+
+    result
+}
+
+fn top_row(grid: &SudokuGrid) -> String {
+    line(grid, '╔', '╦', '╤', |_| '═', '═', '╗', true)
+}
+
+fn thin_separator_line(grid: &SudokuGrid) -> String {
+    line(grid, '╟', '╫', '┼', |_| '─', '─', '╢', true)
+}
+
+fn thick_separator_line(grid: &SudokuGrid) -> String {
+    line(grid, '╠', '╬', '╪', |_| '═', '═', '╣', true)
+}
+
+fn bottom_row(grid: &SudokuGrid) -> String {
+    line(grid, '╚', '╩', '╧', |_| '═', '═', '╝', false)
+}
+
+fn content_row(grid: &SudokuGrid, y: usize) -> String {
+    line(grid, '║', '║', '│', |x| to_char(grid.get_cell(x, y).unwrap()), ' ', '║', true)
+}
+
+impl Display for SudokuGrid {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let size = self.size();
+
+        if size > 9 {
+            return Err(Error::default());
+        }
+
+        let top_row = top_row(self);
+        let thin_separator_line = thin_separator_line(self);
+        let thick_separator_line = thick_separator_line(self);
+        let bottom_row = bottom_row(self);
+
+        for y in 0..size {
+            if y == 0 {
+                f.write_str(top_row.as_str())?;
+            }
+            else if y % self.block_height == 0 {
+                f.write_str(thick_separator_line.as_str())?;
+            }
+            else {
+                f.write_str(thin_separator_line.as_str())?;
+            }
+            
+            f.write_str(content_row(self, y).as_str())?;
+        }
+
+        f.write_str(bottom_row.as_str())?;
+        Ok(())
+    }
+}
+
+fn to_string(cell: &Option<usize>) -> String {
+    if let Some(number) = cell {
+        number.to_string()
+    }
+    else {
+        String::from("")
+    }
+}
+
+pub(crate) fn index(column: usize, row: usize, size: usize) -> SudokuResult<usize> {
+    if column < size || row < size {
+        Ok(row * size + column)
+    }
+    else {
+        Err(SudokuError::OutOfBounds)
+    }
+}
+
+fn parse_dimensions(code: &str) -> Result<(usize, usize), SudokuParseError> {
+    let parts: Vec<&str> = code.spilt('x').collect();
+
+    if parts.len() != 2 {
+        return Err(SudokuParseError::MalformedDimensions);
+    }
+
+    Ok((part[0].parse()?, parts[1].parse()?))
+}
+
+impl SudokuGrid {}
