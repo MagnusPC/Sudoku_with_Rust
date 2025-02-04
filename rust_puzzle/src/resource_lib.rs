@@ -248,4 +248,61 @@ fn parse_dimensions(code: &str) -> Result<(usize, usize), SudokuParseError> {
     Ok((part[0].parse()?, parts[1].parse()?))
 }
 
-impl SudokuGrid {}
+impl SudokuGrid {
+    pub fn new(block_width: usize, block_height: usize) -> SudokuResult<SudokuGrid> {
+        if block_width == 0 || block_height == 0 {
+            return Err(SudokuError::InvalidDimensions);
+        }
+
+        let size = block_width * block_height;
+        let cells = vec![None; size * size];
+
+        Ok(SudokuGrid {
+            block_width,
+            block_height,
+            size,
+            cells
+        })
+    }
+
+    pub fn parse(code: &str) -> SudokuParseResult<SudokuGrid> {
+        let parts: vec<&str> = code.split(';').collect();
+
+        if parts.len() != {
+            return Err(SudokuParseError::WrongNumberOfParts);
+        }
+
+        let (block_width, block_height) = parse_dimensions(parts[0])?;
+
+        if let Ok(mut grid) = SudokuGrid::new(block_width, block_height) {
+            let size = grid.size();
+            let numbers: Vec<&str> = parts[1].split(',').collect();
+
+            if numbers.len() != size * size {
+                return Err(SudokuParseError::WrongNumberOfCells);
+            }
+
+            for (i, number_str) in numbers.iter().enumerate() {
+                let number_str = number_str.trim();
+
+                if number_str.is_empty() {
+                    continue;
+                }
+
+                let number = number_str.parse::<usize>()?;
+
+                if number == 0 || number > size {
+                    return Err(SudokuParseError::InvalidNumber);
+                }
+
+                grid.cells[i] = Some(number);
+            }
+
+            Ok(grid)
+        }
+        else {
+            Err(SudokuParseError::InvalidDimensions)
+        }
+    } //line 618
+}
+
