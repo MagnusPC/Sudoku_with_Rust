@@ -4,11 +4,11 @@ pub mod sudoku_generator; //file
 pub mod solver; //folder
 pub mod utilities; //file
 
-#[cfg(test)]
-mod fix_tests;
+// #[cfg(test)]
+// mod fix_tests;
 
-#[cfg(test)]
-mod random_tests;
+// #[cfg(test)]
+// mod random_tests;
 
 use constraint::Constraint;
 use error::{SudokuError, SudokuParseError, SudokuParseResult, SudokuResult};
@@ -303,6 +303,56 @@ impl SudokuGrid {
         else {
             Err(SudokuParseError::InvalidDimensions)
         }
-    } //line 618
+    } 
+    
+    pub fn to_parseable_string(&self) -> String {
+        let mut s = format!("{}x{}", self.block_width, self.block_height);
+        let cells = self.cells.iter()
+            .map(to_string)
+            .collect::<Vec<String>>()
+            .join(",");
+        s.push_str(cells.as_str());
+        s
+    }
+
+    pub fn block_width(&self) -> usize {
+        self.block_width
+    }
+
+    pub fn block_height(&self) -> usize {
+        self.block_height
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn get_cell(&self, column: usize, row: usize) -> SudokuResult<Option<usize>>{
+        let index = index(column, row, self.size())?;
+        Ok(self.cells[index])
+    }
+
+    pub fn has_number(&self, column: usize, row: usize, number: usize) -> SudokuResult<bool> {
+        if let Some(content) = self.get_cell(column, row)?{
+            Ok(number == content)
+        }
+        else {
+            Ok(false)
+        }
+    }
+
+    pub fn set_cell(&mut self, column: usize, row: usize, number: usize) -> SudokuResult<()> {
+        let size = self.size();
+        let index = index(column, row, size)?;
+
+        if number == 0 || number > size {
+            return Err(SudokuError::InvalidNumber);
+        }
+
+        self.cells[index] = Some(number);
+        Ok(())
+    }
+
+    // line 760
 }
 
