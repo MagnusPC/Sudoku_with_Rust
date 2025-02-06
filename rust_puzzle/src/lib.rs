@@ -1,8 +1,8 @@
 pub mod constraint; //folder
 pub mod error; //file
-pub mod generator; //file
+pub mod sudoku_generator; //file
 pub mod solver; //folder
-pub mod util; //file
+pub mod utilities; //file
 
 #[cfg(test)]
 mod fix_tests;
