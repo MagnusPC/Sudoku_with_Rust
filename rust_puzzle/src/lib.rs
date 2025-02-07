@@ -431,5 +431,66 @@ pub struct Sudoku<C: Constraint + Clone> {
     constraint: C
 }
 
-//line 886
+impl<C: Constraint + Clone> Sudoku<C> {
+    pub fn new_empty(block_width: usize, block_height: usize, constraint: C) -> SudokuResult<Sudoku<C>>{
+        Ok(Sudoku { grid: SudokuGrid::new(block_width, block_height)?, constraint})
+    }
 
+    pub fn new_with_grid(grid: SudokuGrid, constraint: C) -> Sudoku<C>{
+        Sudoku {
+            grid,
+            constraint
+        }
+    }
+
+    pub fn parse(code: &str, constraint: C) -> SudokuParseResult<Sudoku<C>> {
+        Ok(Sudoku::new_with_grid(SudokuGrid::parse(code)?, constraint))
+    }
+
+    pub fn grid(&self) -> &SudokuGrid {
+        &self.grid
+    }
+
+    pub fn grid_mut(&mut self) -> &mut SudokuGrid {
+        &mut self.grid
+    }
+
+    pub fn constraint(&self) -> &C {
+        &self.constraint
+    }
+
+    pub fn constraint_mut(&mut self) -> &mut C {
+        &mut self.constraint
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.constraint.check(&self.grid)
+    }
+
+    pub fn is_valid_cell(&self, column: usize, row: usize) -> SudokuResult<bool> {
+        let size = self.grid.size();
+
+        if column >= size || row >= size {
+            Err(SudokuError::OutOfBounds)
+        }
+        else {
+            Ok(self.constraint.check_cell(&self.grid, column, row))
+        }
+    }
+
+    pub fn is_valid_number(&self,column: usize, row: usize, number: usize) -> SudokuResult<bool> {
+        let size = self.grid.size();
+
+        if column >= size || row >= size {
+            Err(SudokuError::OutOfBounds)
+        }
+        else if number == 0 || number > size {
+            Err(SudokuError::InvalidNumber)
+        }
+        else {
+            Ok(self.constraint.check_number(&self.grid, column, row, number))
+        }
+    }
+
+    //line 1045
+}
