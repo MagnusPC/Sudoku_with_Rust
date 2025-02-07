@@ -353,6 +353,83 @@ impl SudokuGrid {
         Ok(())
     }
 
-    // line 760
+    pub fn clear_cell(&mut self, column: usize, row: usize) -> SudokuResult<()>{
+        let index = index(column, row, self.size())?;
+        self.cells[index] = None;
+        Ok(())
+    }
+
+    fn verify_dimensions(&self, other: &SudokuGrid) -> SudokuResult<()>{
+        if self.block_width != other.block_width || self.block_height != other.block_height {
+            Err(SudokuError::InvalidDimensions)
+        }
+        else{
+            Ok(())
+        }
+    }
+
+    pub fn assign(&mut self, other: &SudokuGrid) -> SudokuResult<()>{
+        self.verify_dimensions(other)?;
+        self.cells.copy_from_slice(&other.cells);
+        Ok(())
+    }
+
+    pub fn count_clues(&self) -> usize {
+        let size = self.size();
+        let mut clues = 0usize;
+
+        for row in 0..size {
+            for column in 0..size {
+                if self.get_cell(column, row).unwrap().is_some() {
+                    clues += 1;
+                }
+            }
+        }
+
+        clues
+    }
+
+    pub fn is_full(&self) -> bool {
+        !self.cells.iter().any(|c| c == &None)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cells.iter().all(|c| c == &None)
+    }
+
+    pub fn is_subset(&self, other: &SudokuGrid) -> SudokuResult<bool> {
+        self.verify_dimensions(other)?;
+        Ok(self.cells.iter()
+            .zip(other.cells.iter())
+            .all(|(self_cell, other_cell)| {
+                match self_cell {
+                    Some(self_number) => match other_cell {
+                        Some(other_number) => self_number == other_number,
+                        None => false
+                    },
+                    None => true
+                }
+            }))
+    }
+
+    pub fn is_superset(&self, other: &SudokuGrid) -> SudokuResult<bool>{
+        other.is_subset(self)
+    }
+
+    pub fn cells(&self) -> &Vec<Option<usize>> {
+        &self.cells
+    }
+
+    pub fn cells_mut(&mut self) -> &mut Vec<Option<usize>>{
+        &mut self.cells
+    }
 }
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct Sudoku<C: Constraint + Clone> {
+    grid: SudokuGrid,
+    constraint: C
+}
+
+//line 886
 
