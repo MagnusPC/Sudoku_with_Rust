@@ -91,4 +91,96 @@ impl<'a> USizeSetIter<'a> {
 
 const U64_BIT_SIZE: usize = mem::size_of::<u64>() * 8;
 
-// line 113
+impl<'a> Iterator for USizeSetIter<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<usize> {
+        loop {
+            if let Some(bit_index) = self.current.next() {
+                return Some(self.offset + bit_index);
+            }
+
+            if let Some(&next_content) = self.content.next() {
+                self.current = BitIterator::new(next_content);
+                self.offset += U64_BIT_SIZE;
+            }
+            else {
+                return None;
+            }
+        }
+    }
+}
+
+impl USizeSet {
+    pub fn new(lower: usize, upper: usize) -> USizeSetResult<USizeSet> {
+        if lower > upper {
+            Err(USizeSetError::InvalidBounds)
+        }
+        else {
+            let required_words = (upper - lower + 64) >> 6;
+            Ok(USizeSet {
+                lower, upper, len: 0, content: vec![0u64; required_words]
+            })
+        }
+    }
+
+    pub fn singleton(lower: usize, upper: usize, content: usize) -> USizeSetResult<USizeSet> {
+        let mut result = USizeSet::new(lower, upper)?;
+        result.insert(content)?;
+        Ok(result)
+    }
+
+    pub fn range(lower: usize, upper: usize) -> USizeSetResult<USizeSet> {
+        if lower > upper {
+            Err(USizeSetError::InvalidBounds)
+        }
+        else {
+            let mut content = Vec::new();
+            let ones = upper - lower + 1;
+            let ones_words = ones / U64_BIT_SIZE;
+
+            for _ in 0..ones_words {
+                content.push(!0);
+            }
+
+            let remaining_ones = ones - (ones_words << 6);
+
+            if remaining_ones > 0 {
+                content.push((1 << remaining_ones) - 1);
+            }
+
+            Ok(USizeSet {
+                lower, upper, len:ones, content
+            })
+        }
+    }
+
+    fn compute_index(&self, number: usize) -> USizeSetResult<(usize, u64)> {
+        if number < self.lower || number > self.upper {
+            Err(USizeSetError::OutOfBounds)
+        }
+        else {
+            let index = number - self.lower;
+            let word_index = index >> 6;
+            let sub_word_index = index & 63;
+            let mask = 1u64 << sub_word_index;
+            Ok((word_index, mask))
+        }
+    }
+
+    pub fn lower(&self) -> usize {
+        self.lower
+    }
+
+    pub fn upper(&self) -> usize {
+        self.upper
+    }
+
+    pub fn min(&self) -> Option<usize> {
+        for (index, &content) in self.content.iter().enumerate() {
+            let trailing_zeros = content.trailing_zeros() as usize;
+
+            //line 266
+        }
+    }
+}
