@@ -4,11 +4,11 @@ pub mod sudoku_generator; //file
 pub mod solver; //folder
 pub mod utilities; //file
 
-// #[cfg(test)]
-// mod fix_tests;
+#[cfg(test)]
+mod fix_tests;
 
-// #[cfg(test)]
-// mod random_tests;
+#[cfg(test)]
+mod random_tests;
 
 use constraint::Constraint;
 use error::{SudokuError, SudokuParseError, SudokuParseResult, SudokuResult};
@@ -514,20 +514,28 @@ mod tests {
         if let Ok(grid) = grid_res {
             assert_eq!(2, grid.block_width());
             assert_eq!(2, grid.block_height());
+            // first row, first cell
             assert_eq!(Some(1), grid.get_cell(0,0).unwrap());
             assert_eq!(None, grid.get_cell(1, 0).unwrap());
+            // first row, second cell
             assert_eq!(None, grid.get_cell(2, 0).unwrap());
             assert_eq!(Some(2), grid.get_cell(3, 0).unwrap());
+            // second row, first cell
             assert_eq!(None, grid.get_cell(0, 1).unwrap());
             assert_eq!(Some(3), grid.get_cell(1, 1).unwrap());
+            // second row, second cell
             assert_eq!(None, grid.get_cell(2, 1).unwrap());
             assert_eq!(Some(4), grid.get_cell(3, 1).unwrap());
+            // first row, third cell
             assert_eq!(None, grid.get_cell(0, 2).unwrap());
             assert_eq!(Some(2), grid.get_cell(1, 2).unwrap());
+            // first row, fourth cell
             assert_eq!(None, grid.get_cell(2, 2).unwrap());
             assert_eq!(None, grid.get_cell(3, 2).unwrap());
+            // second row, third cell
             assert_eq!(Some(3), grid.get_cell(0, 3).unwrap());
             assert_eq!(None, grid.get_cell(1, 3).unwrap());
+            // second row, fourth cell
             assert_eq!(None, grid.get_cell(2, 3).unwrap());
             assert_eq!(None, grid.get_cell(3, 3).unwrap());
         }
@@ -548,28 +556,23 @@ mod tests {
 
     #[test]
     fn parse_wrong_number_of_parts() {
-        assert_eq!(Err(SudokuParseError::WrongNumberOfParts),
-            SudokuGrid::parse("2x2;,,,,,,,,,,,,,,,;whatever"));
+        assert_eq!(Err(SudokuParseError::WrongNumberOfParts), SudokuGrid::parse("2x2;,,,,,,,,,,,,,,,;whatever"));
     }
 
     #[test]
     fn parse_number_format_error() {
-        assert_eq!(Err(SudokuParseError::NumberFormatError),
-            SudokuGrid::parse("2x#;,"));
+        assert_eq!(Err(SudokuParseError::NumberFormatError), SudokuGrid::parse("2x#;,"));
     }
 
     #[test]
     fn parse_invalid_number() {
-        assert_eq!(Err(SudokuParseError::InvalidNumber),
-            SudokuGrid::parse("2x2;,,,4,,,5,,,,,,,,,"));
+        assert_eq!(Err(SudokuParseError::InvalidNumber), SudokuGrid::parse("2x2;,,,4,,,5,,,,,,,,,"));
     }
 
     #[test]
     fn parse_wrong_number_of_cells() {
-        assert_eq!(Err(SudokuParseError::WrongNumberOfCells),
-            SudokuGrid::parse("2x2;1,2,3,4,1,2,3,4,1,2,3,4,1,2,3"));
-        assert_eq!(Err(SudokuParseError::WrongNumberOfCells),
-            SudokuGrid::parse("2x2;1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1"));
+        assert_eq!(Err(SudokuParseError::WrongNumberOfCells), SudokuGrid::parse("2x2;1,2,3,4,1,2,3,4,1,2,3,4,1,2,3"));
+        assert_eq!(Err(SudokuParseError::WrongNumberOfCells), SudokuGrid::parse("2x2;1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1"));
     }
 
     #[test]
@@ -621,8 +624,7 @@ mod tests {
         assert!(full.is_full());
     }
 
-    fn assert_subset_relation(a: &SudokuGrid, b: &SudokuGrid, a_subset_b: bool,
-            b_subset_a: bool) {
+    fn assert_subset_relation(a: &SudokuGrid, b: &SudokuGrid, a_subset_b: bool, b_subset_a: bool) {
         assert!(a.is_subset(b).unwrap() == a_subset_b);
         assert!(a.is_superset(b).unwrap() == b_subset_a);
         assert!(b.is_subset(a).unwrap() == b_subset_a);
