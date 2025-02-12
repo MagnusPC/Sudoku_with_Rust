@@ -492,5 +492,254 @@ impl<C: Constraint + Clone> Sudoku<C> {
         }
     }
 
-    //line 1045
+    pub fn is_valid_solution(&self, solution: &SudokuGrid) -> SudokuResult<bool>{
+        Ok(self.grid.is_subset(solution)? && self.constraint.check(solution) && solution.is_full())
+    }
+
+    pub fn into_raw_parts(self) -> (SudokuGrid, C) {
+        (self.grid, self.constraint)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::constraint::DefaultConstraint;
+
+    #[test]
+    fn parse_ok(){
+        let grid_res = SudokuGrid::parse("2x2; 1,,,2, ,3,,4, ,2,,, 3,,,");
+
+        if let Ok(grid) = grid_res {
+            assert_eq!(2, grid.block_width());
+            assert_eq!(2, grid.block_height());
+            assert_eq!(Some(1), grid.get_cell(0,0).unwrap());
+            assert_eq!(None, grid.get_cell(1, 0).unwrap());
+            assert_eq!(None, grid.get_cell(2, 0).unwrap());
+            assert_eq!(Some(2), grid.get_cell(3, 0).unwrap());
+            assert_eq!(None, grid.get_cell(0, 1).unwrap());
+            assert_eq!(Some(3), grid.get_cell(1, 1).unwrap());
+            assert_eq!(None, grid.get_cell(2, 1).unwrap());
+            assert_eq!(Some(4), grid.get_cell(3, 1).unwrap());
+            assert_eq!(None, grid.get_cell(0, 2).unwrap());
+            assert_eq!(Some(2), grid.get_cell(1, 2).unwrap());
+            assert_eq!(None, grid.get_cell(2, 2).unwrap());
+            assert_eq!(None, grid.get_cell(3, 2).unwrap());
+            assert_eq!(Some(3), grid.get_cell(0, 3).unwrap());
+            assert_eq!(None, grid.get_cell(1, 3).unwrap());
+            assert_eq!(None, grid.get_cell(2, 3).unwrap());
+            assert_eq!(None, grid.get_cell(3, 3).unwrap());
+        }
+        else {
+            panic!("Parsing valid grid failed.");
+        }
+    }
+
+    #[test]
+    fn parse_malformed_dimensions(){
+        assert_eq!(Err(SudokuParseError::MalformedDimensions), SudokuGrid::parse("2x2x2;,,,,,,,,,,,,,,,"));
+    }
+
+    #[test]
+    fn parse_invalid_dimensions(){
+        assert_eq!(Err(SudokuParseError::InvalidDimensions), SudokuGrid::parse("2x0;,"));
+    }
+
+    #[test]
+    fn parse_wrong_number_of_parts() {
+        assert_eq!(Err(SudokuParseError::WrongNumberOfParts),
+            SudokuGrid::parse("2x2;,,,,,,,,,,,,,,,;whatever"));
+    }
+
+    #[test]
+    fn parse_number_format_error() {
+        assert_eq!(Err(SudokuParseError::NumberFormatError),
+            SudokuGrid::parse("2x#;,"));
+    }
+
+    #[test]
+    fn parse_invalid_number() {
+        assert_eq!(Err(SudokuParseError::InvalidNumber),
+            SudokuGrid::parse("2x2;,,,4,,,5,,,,,,,,,"));
+    }
+
+    #[test]
+    fn parse_wrong_number_of_cells() {
+        assert_eq!(Err(SudokuParseError::WrongNumberOfCells),
+            SudokuGrid::parse("2x2;1,2,3,4,1,2,3,4,1,2,3,4,1,2,3"));
+        assert_eq!(Err(SudokuParseError::WrongNumberOfCells),
+            SudokuGrid::parse("2x2;1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1"));
+    }
+
+    #[test]
+    fn to_parseable_string() {
+        let mut grid = SudokuGrid::new(2, 2).unwrap();
+
+        assert_eq!("2x2;,,,,,,,,,,,,,,,", grid.to_parseable_string().as_str());
+
+        grid.set_cell(0, 0, 1).unwrap();
+        grid.set_cell(1, 1, 2).unwrap();
+        grid.set_cell(2, 2, 3).unwrap();
+        grid.set_cell(3, 3, 4).unwrap();
+
+        assert_eq!("2x2;1,,,,,2,,,,,3,,,,,4",
+            grid.to_parseable_string().as_str());
+
+        let grid = SudokuGrid::new(4, 1).unwrap();
+
+        assert_eq!("4x1;,,,,,,,,,,,,,,,", grid.to_parseable_string().as_str());
+    }
+
+    #[test]
+    fn size() {
+        let grid1x1 = SudokuGrid::new(1, 1).unwrap();
+        let grid3x2 = SudokuGrid::new(3, 2).unwrap();
+        let grid3x4 = SudokuGrid::new(3, 4).unwrap();
+        assert_eq!(1, grid1x1.size());
+        assert_eq!(6, grid3x2.size());
+        assert_eq!(12, grid3x4.size());
+    }
+
+    #[test]
+    fn count_clues_and_empty_and_full() {
+        let empty = SudokuGrid::parse("2x2;,,,,,,,,,,,,,,,").unwrap();
+        let partial = SudokuGrid::parse("2x2;1,,3,2,4,,,,,,,,,,1,").unwrap();
+        let full = SudokuGrid::parse("2x2;2,3,4,1,1,4,2,3,4,1,3,2,3,2,1,4")
+            .unwrap();
+
+        assert_eq!(0, empty.count_clues());
+        assert_eq!(5, partial.count_clues());
+        assert_eq!(16, full.count_clues());
+
+        assert!(empty.is_empty());
+        assert!(!partial.is_empty());
+        assert!(!full.is_empty());
+
+        assert!(!empty.is_full());
+        assert!(!partial.is_full());
+        assert!(full.is_full());
+    }
+
+    fn assert_subset_relation(a: &SudokuGrid, b: &SudokuGrid, a_subset_b: bool,
+            b_subset_a: bool) {
+        assert!(a.is_subset(b).unwrap() == a_subset_b);
+        assert!(a.is_superset(b).unwrap() == b_subset_a);
+        assert!(b.is_subset(a).unwrap() == b_subset_a);
+        assert!(b.is_superset(a).unwrap() == a_subset_b);
+    }
+
+    fn assert_true_subset(a: &SudokuGrid, b: &SudokuGrid) {
+        assert_subset_relation(a, b, true, false)
+    }
+
+    fn assert_equal_set(a: &SudokuGrid, b: &SudokuGrid) {
+        assert_subset_relation(a, b, true, true)
+    }
+
+    fn assert_unrelated_set(a: &SudokuGrid, b: &SudokuGrid) {
+        assert_subset_relation(a, b, false, false)
+    }
+
+    #[test]
+    fn empty_is_subset() {
+        let empty = SudokuGrid::new(2, 2).unwrap();
+        let non_empty = SudokuGrid::parse("2x2;1,,,,,,,,,,,,,,,").unwrap();
+        let full = SudokuGrid::parse("2x2;1,2,3,4,3,4,1,2,2,3,1,4,4,1,3,2")
+            .unwrap();
+
+        assert_equal_set(&empty, &empty);
+        assert_true_subset(&empty, &non_empty);
+        assert_true_subset(&empty, &full);
+    }
+
+    #[test]
+    fn equal_grids_subsets() {
+        let g = SudokuGrid::parse("2x2;1,,3,,2,,,,4,,4,3,,,,2").unwrap();
+        assert_equal_set(&g, &g);
+    }
+
+    #[test]
+    fn true_subset() {
+        let g1 = SudokuGrid::parse("2x2;1,,3,,2,,,,4,,4,3,,,,2").unwrap();
+        let g2 = SudokuGrid::parse("2x2;1,2,3,,2,,3,,4,,4,3,,,1,2").unwrap();
+        assert_true_subset(&g1, &g2);
+    }
+
+    #[test]
+    fn unrelated_grids_not_subsets() {
+        // g1 and g2 differ in the third digit (3 in g1, 4 in g2)
+        let g1 = SudokuGrid::parse("2x2;1,,3,,2,,,,4,,4,3,,,,2").unwrap();
+        let g2 = SudokuGrid::parse("2x2;1,2,4,,2,,3,,4,,4,3,,,1,2").unwrap();
+        assert_unrelated_set(&g1, &g2);
+    }
+
+    fn solution_example_sudoku() -> Sudoku<DefaultConstraint> {
+        Sudoku::parse("2x2;\
+            2, , , ,\
+             , ,3, ,\
+             , , ,4,\
+             ,2, , ", DefaultConstraint).unwrap()
+    }
+
+    #[test]
+    fn solution_not_full() {
+        let sudoku = solution_example_sudoku();
+        let solution = SudokuGrid::parse("2x2;\
+            2,3,4,1,\
+            1,4,3, ,\
+            3,1,2,4,\
+            4,2,1,3").unwrap();
+        assert!(!sudoku.is_valid_solution(&solution).unwrap());
+    }
+
+    #[test]
+    fn solution_not_superset() {
+        let sudoku = solution_example_sudoku();
+        let solution = SudokuGrid::parse("2x2;\
+            2,3,4,1,\
+            1,4,3,2,\
+            3,2,1,4,\
+            4,1,2,3").unwrap();
+        assert!(!sudoku.is_valid_solution(&solution).unwrap());
+    }
+
+    #[test]
+    fn solution_violates_constraint() {
+        let sudoku = solution_example_sudoku();
+        let solution = SudokuGrid::parse("2x2;\
+            2,3,4,1,\
+            1,3,3,2,\
+            3,1,2,4,\
+            4,2,1,3").unwrap();
+        assert!(!sudoku.is_valid_solution(&solution).unwrap());
+    }
+
+    #[test]
+    fn solution_correct() {
+        let sudoku = solution_example_sudoku();
+        let solution = SudokuGrid::parse("2x2;\
+            2,3,4,1,\
+            1,4,3,2,\
+            3,1,2,4,\
+            4,2,1,3").unwrap();
+        assert!(sudoku.is_valid_solution(&solution).unwrap());
+    }
+
+    #[test]
+    fn sudoku_grid_serde_consistent() {
+        let grid = SudokuGrid::parse("3x2;\
+            1, ,3, ,5, ,\
+             ,2, ,4, ,6,\
+            3, ,5, ,1, ,\
+             ,4, ,6, ,2,\
+            5, ,1, ,3, ,\
+             ,6, ,2, ,4").unwrap();
+        let json = serde_json::to_string(&grid).unwrap();
+        let reconstructed_grid: SudokuGrid =
+            serde_json::from_str(&json).unwrap();
+
+        assert_eq!(grid, reconstructed_grid);
+    }
+
 }
