@@ -2,73 +2,69 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::mem;
 use std::ops::{
-    BitAnd,
-    BitAndAssign,
-    BitOr,
-    BitOrAssign,
-    BitXor,
-    BitXorAssign,
-    Not,
-    Sub,
-    SubAssign
+    BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Sub, SubAssign,
 };
 use std::slice::Iter;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct USizeSet{
+pub struct USizeSet {
     lower: usize,
     upper: usize,
     len: usize,
-    content: Vec<u64>
+    content: Vec<u64>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum USizeSetError{
+pub enum USizeSetError {
     InvalidBounds,
     DifferentBounds,
-    OutOfBounds
+    OutOfBounds,
 }
 
 pub type USizeSetResult<V> = Result<V, USizeSetError>;
 
-struct BitIterator{
+struct BitIterator {
     bit_index: usize,
-    value: u64
+    value: u64,
 }
 
-impl BitIterator{
-    fn new(value: u64) -> BitIterator{
-        BitIterator{
+impl BitIterator {
+    fn new(value: u64) -> BitIterator {
+        BitIterator {
             bit_index: 0,
-            value
+            value,
         }
     }
 
-    fn progress(&mut self){
+    fn progress(&mut self) {
         let diff = self.value.trailing_zeros() as usize;
         self.value >>= diff;
         self.bit_index += diff;
     }
 }
 
-impl Iterator for BitIterator{
+impl Iterator for BitIterator {
     type Item = usize;
-    
-    fn next(&mut self) -> Option<usize>{
+
+    fn next(&mut self) -> Option<usize> {
         if self.value != 0 && (self.value & 1) == 0 {
             self.progress();
         }
 
-        let result = if self.value == 0 { None } else { Some(self.bit_index) };
+        let result = if self.value == 0 {
+            None
+        } else {
+            Some(self.bit_index)
+        };
         self.value &= 0xfffffffffffffffe;
         result
     }
 }
 
-pub struct USizeSetIter<'a>{
+pub struct USizeSetIter<'a> {
     offset: usize,
     current: BitIterator,
-    content: Iter<'a, u64>
+    content: Iter<'a, u64>,
 }
 
 impl<'a> USizeSetIter<'a> {
@@ -76,15 +72,14 @@ impl<'a> USizeSetIter<'a> {
         let mut iter = set.content.iter();
         let first_bit_iterator = if let Some(&first) = iter.next() {
             BitIterator::new(first)
-        }
-        else{
+        } else {
             BitIterator::new(0)
         };
 
-        USizeSetIter{
+        USizeSetIter {
             offset: set.lower,
             current: first_bit_iterator,
-            content: iter
+            content: iter,
         }
     }
 }
@@ -103,8 +98,7 @@ impl<'a> Iterator for USizeSetIter<'a> {
             if let Some(&next_content) = self.content.next() {
                 self.current = BitIterator::new(next_content);
                 self.offset += U64_BIT_SIZE;
-            }
-            else {
+            } else {
                 return None;
             }
         }
@@ -115,11 +109,13 @@ impl USizeSet {
     pub fn new(lower: usize, upper: usize) -> USizeSetResult<USizeSet> {
         if lower > upper {
             Err(USizeSetError::InvalidBounds)
-        }
-        else {
+        } else {
             let required_words = (upper - lower + 64) >> 6;
             Ok(USizeSet {
-                lower, upper, len: 0, content: vec![0u64; required_words]
+                lower,
+                upper,
+                len: 0,
+                content: vec![0u64; required_words],
             })
         }
     }
@@ -133,8 +129,7 @@ impl USizeSet {
     pub fn range(lower: usize, upper: usize) -> USizeSetResult<USizeSet> {
         if lower > upper {
             Err(USizeSetError::InvalidBounds)
-        }
-        else {
+        } else {
             let mut content = Vec::new();
             let ones = upper - lower + 1;
             let ones_words = ones / U64_BIT_SIZE;
@@ -150,7 +145,10 @@ impl USizeSet {
             }
 
             Ok(USizeSet {
-                lower, upper, len:ones, content
+                lower,
+                upper,
+                len: ones,
+                content,
             })
         }
     }
@@ -158,8 +156,7 @@ impl USizeSet {
     fn compute_index(&self, number: usize) -> USizeSetResult<(usize, u64)> {
         if number < self.lower || number > self.upper {
             Err(USizeSetError::OutOfBounds)
-        }
-        else {
+        } else {
             let index = number - self.lower;
             let word_index = index >> 6;
             let sub_word_index = index & 63;
@@ -180,7 +177,56 @@ impl USizeSet {
         for (index, &content) in self.content.iter().enumerate() {
             let trailing_zeros = content.trailing_zeros() as usize;
 
-            //line 266
+            if trailing_zeros < U64_BIT_SIZE {
+                let offset = index * U64_BIT_SIZE + trailing_zeros;
+                return Some(self.lower + offset);
+            }
+        }
+
+        None
+    }
+
+    pub fn max(&self) -> Option<usize> {
+        for (index, &content) in self.content.iter().enumerate().rev() {
+            let leading_zeros = content.leading_zeros() as usize;
+
+            if leading_zeros < U64_BIT_SIZE {
+                let offset = (index + 1) * U64_BIT_SIZE - leading_zeros - 1;
+                return Some(self.lower + offset);
+            }
+        }
+
+        None
+    }
+
+    pub fn contains(&self, number: usize) -> bool {
+        if let Ok((word_index, mask)) = self.compute_index(number) {
+            (self.content[word_index] & mask) > 0
+        } else {
+            false
+        }
+    }
+
+    pub fn insert(&mut self, number: usize) -> USizeSetResult<bool> {
+        let (word_index, mask) = self.compute_index(number)?;
+        let word = &mut self.content[word_index];
+
+        if *word & mask == 0 {
+            self.len += 1;
+            *word |= mask;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub fn remove(&mut self, number: usize) -> USizeSetResult<bool> {
+        let (word_index, mask) = self.compute_index(number)?;
+        let word = &mut self.content[word_index];
+
+        if *word & mask > 0 {
+            *word &= !mask;
+            // line 345
         }
     }
 }
