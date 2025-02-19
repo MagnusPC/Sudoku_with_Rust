@@ -4,6 +4,7 @@ use std::mem;
 use std::ops::{
     BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Sub, SubAssign,
 };
+use std::ptr::with_exposed_provenance;
 use std::slice::Iter;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -226,7 +227,65 @@ impl USizeSet {
 
         if *word & mask > 0 {
             *word &= !mask;
-            // line 345
+            self.len -= 1;
+            Ok(true)
+        } else {
+            Ok(false)
         }
     }
+
+    pub fn clear(&mut self) {
+        for i in 0..self.content.len() {
+            self.content[i] = 0;
+        }
+
+        self.len = 0;
+    }
+
+    pub fn iter(&self) -> USizeSetIter<'_> {
+        USizeSetIter::new(self)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    fn count(&self) -> usize {
+        self.content.iter().map(|c| c.count_ones() as usize).sum()
+    }
+
+    fn op_assign(
+        &mut self,
+        other: &USizeSet,
+        op: impl Fn(u64, u64) -> u64,
+    ) -> USizeSetResult<bool> {
+        if self.lower() != other.lower() || self.upper() != other.upper() {
+            Err(USizeSetError::DifferentBounds)
+        } else {
+            let contents = self.content.iter_mut().zip(other.content.iter());
+            let mut changed = false;
+
+            for (self_u64, &other_u64) in contents {
+                let self_before = *self_u64;
+                *self_u64 = op(self_before, other_u64);
+                changed |= self_before != *self_u64;
+            }
+
+            self.len = self.count();
+            Ok(changed)
+        }
+    }
+
+    fn op<F>(&self, other: &USizeSet, op_assign: F) -> USizeSetResult<USizeSet>
+    where
+        F: Fn(&mut USizeSet, &USizeSet) -> USizeSetResult<bool>,
+    {
+        let mut clone = self.clone();
+        op_assign(&mut clone, other)?;
+        Ok(clone)
+    } // LINE 415
 }
