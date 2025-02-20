@@ -287,5 +287,81 @@ impl USizeSet {
         let mut clone = self.clone();
         op_assign(&mut clone, other)?;
         Ok(clone)
-    } // LINE 415
+    }
+
+    pub fn union_assign(&mut self, other: &USizeSet) -> USizeSetResult<bool> {
+        self.op_assign(other, u64::bitor)
+    }
+
+    pub fn union(&self, other: &USizeSet) -> USizeSetResult<USizeSet> {
+        self.op(other, USizeSet::union_assign)
+    }
+
+    pub fn intersect_assign(&mut self, other: &USizeSet) -> USizeSetResult<bool> {
+        self.op_assign(other, u64::bitand)
+    }
+
+    pub fn intersect(&self, other: &USizeSet) -> USizeSetResult<USizeSet> {
+        self.op(other, USizeSet::intersect_assign)
+    }
+
+    pub fn difference_assign(&mut self, other: &USizeSet) -> USizeSetResult<bool> {
+        self.op_assign(other, |a, b| a & !b)
+    }
+
+    pub fn difference(&self, other: &USizeSet) -> USizeSetResult<USizeSet> {
+        self.op(other, USizeSet::difference_assign)
+    }
+
+    pub fn symmetric_difference_assign(&mut self, other: &USizeSet) -> USizeSetResult<bool> {
+        self.op_assign(other, u64::bitxor)
+    }
+
+    pub fn symmetric_difference(&self, other: &USizeSet) -> USizeSetResult<USizeSet> {
+        self.op(other, USizeSet::symmetric_difference_assign)
+    }
+
+    pub fn complement_assign(&mut self) {
+        let len = self.content.len();
+
+        for i in 0..(len - 1) {
+            self.content[i] = !self.content[i];
+        }
+
+        let rem_bits = (self.upper() - self.lower() + 1) % U64_BIT_SIZE;
+
+        if rem_bits > 0 {
+            let mask = u64::MAX >> (U64_BIT_SIZE - rem_bits);
+            self.content[len - 1] ^= mask;
+        }
+
+        self.len = self.count();
+    }
+
+    pub fn complement(&self) -> USizeSet {
+        let mut result = self.clone();
+        result.complement_assign();
+        result
+    }
+
+    fn rel<F>(&self, other: &USizeSet, u64_rel: F) -> USizeSetResult<bool>
+    where
+        F: Fn(u64, u64) -> bool,
+    {
+        if self.lower != other.lower || self.upper != other.upper {
+            Err(USizeSetError::DifferentBounds)
+        } else {
+            let contents = self.content.iter().zip(other.content.iter());
+
+            for (&self_u64, &other_u64) in contents {
+                if !u64_rel(self_u64, other_u64) {
+                    return Ok(false);
+                }
+            }
+
+            Ok(true)
+        }
+    }
+
+    //line 622
 }
