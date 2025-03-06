@@ -63,5 +63,17 @@ impl<C: IrreducibleConstraint + ?Sized> Constraint for C {
         Err(ReductionError::InvalidReduction)
     }
 
-    //line 92
+    fn revert(&mut self, _: &SudokuGrid, _: &(), _: ()) {}
+
+    #[inline]
+    fn to_objects(&self) -> Vec<&dyn Any>
+    where
+        Self: Sized + 'static,
+    {
+        <C as IrreducibleConstraint>::to_objects(self)
+    }
 }
+#[derive(Clone, Deserialize, Serialize)]
+pub struct RowConstraint;
+
+//107
