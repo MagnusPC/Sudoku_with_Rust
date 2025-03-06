@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 use std::hash::Hash;
-use std::{iter, mem};
 use std::ops::{
     BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Sub, SubAssign,
 };
 use std::ptr::with_exposed_provenance;
 use std::slice::Iter;
+use std::{iter, mem};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct USizeSet {
@@ -537,11 +537,11 @@ impl Not for USizeSet {
     }
 }
 
-pub(crate) fn contains_duplicate<I>(mut iter: I) -> bool 
-where 
-    I: Iterator, 
-    I::Item: Hash + Eq 
-    {
+pub(crate) fn contains_duplicate<I>(mut iter: I) -> bool
+where
+    I: Iterator,
+    I::Item: Hash + Eq,
+{
     let mut set = HashSet::new();
     iter.any(|e| !set.insert(e))
 }
@@ -549,8 +549,7 @@ where
 pub(crate) fn abs_diff(a: usize, b: usize) -> usize {
     if a < b {
         b - a
-    }
-    else {
+    } else {
         a - b
     }
 }
@@ -793,8 +792,7 @@ mod tests {
     #[test]
     fn multi_word_symmetric_difference() {
         let result = triangle_nums_to_100() ^ &fibs_to_100();
-        let expected =
-            set!(1, 100;
+        let expected = set!(1, 100;
                 2, 5, 6, 8, 10, 13, 15, 28, 34, 36, 45, 66, 78, 89, 91);
         assert_eq!(expected, result);
         assert_eq!(15, result.len());
@@ -910,7 +908,7 @@ mod tests {
             set!(1, 10; 2, 3, 5, 7),
             set!(1, 10; 3, 5, 7),
             set!(1, 10; 1, 4, 9),
-            set!(1, 10; 1, 4, 9)
+            set!(1, 10; 1, 4, 9),
         )
     }
 
@@ -920,7 +918,7 @@ mod tests {
             set!(1, 100; 30, 50, 70),
             set!(1, 100; 20, 30, 50),
             set!(1, 100; 10, 40, 90),
-            set!(1, 100; 10, 40, 90)
+            set!(1, 100; 10, 40, 90),
         )
     }
 

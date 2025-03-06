@@ -1,11 +1,27 @@
+// Code lints
+
+#![warn(trivial_casts)]
+#![warn(trivial_numeric_casts)]
+#![warn(unreachable_pub)]
+#![warn(unused_import_braces)]
+#![warn(unused_lifetimes)]
+#![warn(unused_qualifications)]
+
+// // Doc lints
+
+// #![warn(rustdoc::broken_intra_doc_links)]
+// #![warn(missing_docs)]
+// #![warn(rustdoc::missing_crate_level_docs)]
+// #![warn(rustdoc::invalid_codeblock_attributes)]
+
 pub mod constraint; //folder
 pub mod error; //file
-pub mod sudoku_generator; //file
 pub mod solver; //folder
+pub mod sudoku_generator; //file
 pub mod utilities; //file
 
 #[cfg(test)]
-mod fix_tests;
+mod tests_bugfix;
 
 #[cfg(test)]
 mod random_tests;
@@ -13,8 +29,8 @@ mod random_tests;
 use constraint::Constraint;
 use error::{SudokuError, SudokuParseError, SudokuParseResult, SudokuResult};
 
-use serde::{Deserialize, Serialize};
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
+use serde::{Deserialize, Serialize};
 
 use std::fmt::{self, Display, Error, Formatter};
 
@@ -48,109 +64,127 @@ fn build_sudoku_grid<E: de::Error>(
     Ok(grid)
 }
 
-fn read_field<'de, M, V>(buffer: &mut Option<V>, map: &mut M, field_name: &'static str) -> Result<(), M::Error> where
+fn read_field<'de, M, V>(
+    buffer: &mut Option<V>,
+    map: &mut M,
+    field_name: &'static str,
+) -> Result<(), M::Error>
+where
     M: MapAccess<'de>,
-    V: Deserialize<'de>{
-            if buffer.is_some() {
-                Err(<M::Error as de::Error>::duplicate_field(field_name))
-            }
-            else {
-                *buffer = Some(map.next_value()?);
-                Ok(())
-            }
+    V: Deserialize<'de>,
+{
+    if buffer.is_some() {
+        Err(<M::Error as de::Error>::duplicate_field(field_name))
+    } else {
+        *buffer = Some(map.next_value()?);
+        Ok(())
+    }
 }
 
 impl<'de> Deserialize<'de> for SudokuGrid {
     fn deserialize<D>(deserializer: D) -> Result<SudokuGrid, D::Error>
     where
-        D: Deserializer<'de>{
-            #[derive(Deserialize)]
-            #[serde(field_identifier, rename_all = "snake_case")]
-            enum Field {
-                BlockWidth,
-                BlockHeight,
-                Cells
-            }
-
-            const BLOCK_WIDTH_NAME: &str = "block_width";
-            const BLOCK_HEIGHT_NAME: &str = "block_height";
-            const CELLS_NAME: &str = "cells";
-
-            struct SudokuGridVisitor;
-
-            impl<'de> Visitor<'de> for SudokuGridVisitor{
-                type Value = SudokuGrid;
-
-                fn expecting(&self, f: &mut formatter) -> fmt::Result{
-                    write!(f, "struct SudokuGrid")
-                }
-
-                fn visit_seq<V>(self, mut seq: V) -> Result<SudokuGrid, V::Error> where V: SeqAccess<'de>
-                {
-                    let block_width = seq.next_element()?
-                        .ok_or_else(|| de:Error::invalid_length(0, &self))?;
-                    let block_height = seq.next_element()?
-                        .ok_or_else(|| de:Error::invalid_length(1, &self))?;
-                    let cells = seq.next_element()?
-                        .ok_or_else(|| de::Error:invalid_length(2, &self))?;
-                    build_sudoku_grid(block_width, block_height, cells)
-                }
-
-                fn visit_map<V>(self, mut map: V) -> Result<SudokuGrid, V::Error> where V: MapAccess<'de>
-                {
-                    let mut block_width = None;
-                    let mut block_height = None;
-                    let mut cells = None;
-
-                    while let Some(key) = map.next_key()?{
-                        match key {
-                            Field::BlockWidth =>
-                                read_field(&mut block_width, &mut map, BLOCK_WIDTH_NAME)?,
-                            Field::BlockHeight =>
-                                read_field(&mut block_height, &mut map, BLOCK_HEIGHT_NAME)?,
-                            Field::Cells =>
-                                read_field(&mut cells, &mut map, CELLS_NAME)?;
-                        }
-                    }
-
-                    let block_width = block_width.ok_or_else(|| de::Error::missing_field(BLOCK_WIDTH_NAME))?;
-                    let block_height = block_height.ok_or_else(|| de::Error::missing_field(BLOCK_HEIGHT_NAME))?;
-                    let cells = cells.ok_or_else(|| de::Error::missing_field(CELLS_NAME))?;
-                    build_sudoku_grid(block_width, block_height, cells)
-                }
-            }
-
-            const FIELDS: &[&str] = &[
-                BLOCK_WIDTH_NAME,
-                BLOCK_HEIGHT_NAME,
-                CELLS_NAME
-            ];
-            deserializer.deserialize_struct("SudokuGrid", FIELDS, SudokuGridVisitor)
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "snake_case")]
+        enum Field {
+            BlockWidth,
+            BlockHeight,
+            Cells,
         }
+
+        const BLOCK_WIDTH_NAME: &str = "block_width";
+        const BLOCK_HEIGHT_NAME: &str = "block_height";
+        const CELLS_NAME: &str = "cells";
+
+        struct SudokuGridVisitor;
+
+        impl<'de> Visitor<'de> for SudokuGridVisitor {
+            type Value = SudokuGrid;
+
+            fn expecting(&self, f: &mut Formatter) -> fmt::Result {
+                write!(f, "struct SudokuGrid")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<SudokuGrid, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let block_width = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let block_height = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let cells = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                build_sudoku_grid(block_width, block_height, cells)
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<SudokuGrid, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut block_width = None;
+                let mut block_height = None;
+                let mut cells = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::BlockWidth => {
+                            read_field(&mut block_width, &mut map, BLOCK_WIDTH_NAME)?
+                        }
+                        Field::BlockHeight => {
+                            read_field(&mut block_height, &mut map, BLOCK_HEIGHT_NAME)?
+                        }
+                        Field::Cells => read_field(&mut cells, &mut map, CELLS_NAME)?,
+                    }
+                }
+
+                let block_width =
+                    block_width.ok_or_else(|| de::Error::missing_field(BLOCK_WIDTH_NAME))?;
+                let block_height =
+                    block_height.ok_or_else(|| de::Error::missing_field(BLOCK_HEIGHT_NAME))?;
+                let cells = cells.ok_or_else(|| de::Error::missing_field(CELLS_NAME))?;
+                build_sudoku_grid(block_width, block_height, cells)
+            }
+        }
+
+        const FIELDS: &[&str] = &[BLOCK_WIDTH_NAME, BLOCK_HEIGHT_NAME, CELLS_NAME];
+        deserializer.deserialize_struct("SudokuGrid", FIELDS, SudokuGridVisitor)
+    }
 }
 
 fn to_char(cell: Option<usize>) -> char {
     if let Some(n) = cell {
         (b'0' + n as u8) as char
-    }
-    else {
+    } else {
         ' '
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn line(grid: &SudokuGrid, start: char, thick_sep: char, thin_sep: char, segment: impl Fn(usize) -> char, pad: char, end: char, newline: bool) -> String {
+fn line(
+    grid: &SudokuGrid,
+    start: char,
+    thick_sep: char,
+    thin_sep: char,
+    segment: impl Fn(usize) -> char,
+    pad: char,
+    end: char,
+    newline: bool,
+) -> String {
     let size = grid.size();
     let mut result = String::new();
 
     for x in 0..size {
         if x == 0 {
             result.push(start);
-        }
-        else if x % grid.block_width == 0 {
+        } else if x % grid.block_width == 0 {
             result.push(thick_sep);
-        }
-        else {
+        } else {
             result.push(thin_sep)
         }
 
@@ -185,7 +219,16 @@ fn bottom_row(grid: &SudokuGrid) -> String {
 }
 
 fn content_row(grid: &SudokuGrid, y: usize) -> String {
-    line(grid, '║', '║', '│', |x| to_char(grid.get_cell(x, y).unwrap()), ' ', '║', true)
+    line(
+        grid,
+        '║',
+        '║',
+        '│',
+        |x| to_char(grid.get_cell(x, y).unwrap()),
+        ' ',
+        '║',
+        true,
+    )
 }
 
 impl Display for SudokuGrid {
@@ -204,14 +247,12 @@ impl Display for SudokuGrid {
         for y in 0..size {
             if y == 0 {
                 f.write_str(top_row.as_str())?;
-            }
-            else if y % self.block_height == 0 {
+            } else if y % self.block_height == 0 {
                 f.write_str(thick_separator_line.as_str())?;
-            }
-            else {
+            } else {
                 f.write_str(thin_separator_line.as_str())?;
             }
-            
+
             f.write_str(content_row(self, y).as_str())?;
         }
 
@@ -223,8 +264,7 @@ impl Display for SudokuGrid {
 fn to_string(cell: &Option<usize>) -> String {
     if let Some(number) = cell {
         number.to_string()
-    }
-    else {
+    } else {
         String::from("")
     }
 }
@@ -232,20 +272,19 @@ fn to_string(cell: &Option<usize>) -> String {
 pub(crate) fn index(column: usize, row: usize, size: usize) -> SudokuResult<usize> {
     if column < size || row < size {
         Ok(row * size + column)
-    }
-    else {
+    } else {
         Err(SudokuError::OutOfBounds)
     }
 }
 
 fn parse_dimensions(code: &str) -> Result<(usize, usize), SudokuParseError> {
-    let parts: Vec<&str> = code.spilt('x').collect();
+    let parts: Vec<&str> = code.split('x').collect();
 
     if parts.len() != 2 {
         return Err(SudokuParseError::MalformedDimensions);
     }
 
-    Ok((part[0].parse()?, parts[1].parse()?))
+    Ok((parts[0].parse()?, parts[1].parse()?))
 }
 
 impl SudokuGrid {
@@ -261,14 +300,14 @@ impl SudokuGrid {
             block_width,
             block_height,
             size,
-            cells
+            cells,
         })
     }
 
     pub fn parse(code: &str) -> SudokuParseResult<SudokuGrid> {
-        let parts: vec<&str> = code.split(';').collect();
+        let parts: Vec<&str> = code.split(';').collect();
 
-        if parts.len() != {
+        if parts.len() != 2 {
             return Err(SudokuParseError::WrongNumberOfParts);
         }
 
@@ -299,15 +338,16 @@ impl SudokuGrid {
             }
 
             Ok(grid)
-        }
-        else {
+        } else {
             Err(SudokuParseError::InvalidDimensions)
         }
-    } 
-    
+    }
+
     pub fn to_parseable_string(&self) -> String {
         let mut s = format!("{}x{}", self.block_width, self.block_height);
-        let cells = self.cells.iter()
+        let cells = self
+            .cells
+            .iter()
             .map(to_string)
             .collect::<Vec<String>>()
             .join(",");
@@ -327,16 +367,15 @@ impl SudokuGrid {
         self.size
     }
 
-    pub fn get_cell(&self, column: usize, row: usize) -> SudokuResult<Option<usize>>{
+    pub fn get_cell(&self, column: usize, row: usize) -> SudokuResult<Option<usize>> {
         let index = index(column, row, self.size())?;
         Ok(self.cells[index])
     }
 
     pub fn has_number(&self, column: usize, row: usize, number: usize) -> SudokuResult<bool> {
-        if let Some(content) = self.get_cell(column, row)?{
+        if let Some(content) = self.get_cell(column, row)? {
             Ok(number == content)
-        }
-        else {
+        } else {
             Ok(false)
         }
     }
@@ -353,22 +392,21 @@ impl SudokuGrid {
         Ok(())
     }
 
-    pub fn clear_cell(&mut self, column: usize, row: usize) -> SudokuResult<()>{
+    pub fn clear_cell(&mut self, column: usize, row: usize) -> SudokuResult<()> {
         let index = index(column, row, self.size())?;
         self.cells[index] = None;
         Ok(())
     }
 
-    fn verify_dimensions(&self, other: &SudokuGrid) -> SudokuResult<()>{
+    fn verify_dimensions(&self, other: &SudokuGrid) -> SudokuResult<()> {
         if self.block_width != other.block_width || self.block_height != other.block_height {
             Err(SudokuError::InvalidDimensions)
-        }
-        else{
+        } else {
             Ok(())
         }
     }
 
-    pub fn assign(&mut self, other: &SudokuGrid) -> SudokuResult<()>{
+    pub fn assign(&mut self, other: &SudokuGrid) -> SudokuResult<()> {
         self.verify_dimensions(other)?;
         self.cells.copy_from_slice(&other.cells);
         Ok(())
@@ -399,20 +437,18 @@ impl SudokuGrid {
 
     pub fn is_subset(&self, other: &SudokuGrid) -> SudokuResult<bool> {
         self.verify_dimensions(other)?;
-        Ok(self.cells.iter()
-            .zip(other.cells.iter())
-            .all(|(self_cell, other_cell)| {
-                match self_cell {
-                    Some(self_number) => match other_cell {
-                        Some(other_number) => self_number == other_number,
-                        None => false
-                    },
-                    None => true
-                }
-            }))
+        Ok(self.cells.iter().zip(other.cells.iter()).all(
+            |(self_cell, other_cell)| match self_cell {
+                Some(self_number) => match other_cell {
+                    Some(other_number) => self_number == other_number,
+                    None => false,
+                },
+                None => true,
+            },
+        ))
     }
 
-    pub fn is_superset(&self, other: &SudokuGrid) -> SudokuResult<bool>{
+    pub fn is_superset(&self, other: &SudokuGrid) -> SudokuResult<bool> {
         other.is_subset(self)
     }
 
@@ -420,7 +456,7 @@ impl SudokuGrid {
         &self.cells
     }
 
-    pub fn cells_mut(&mut self) -> &mut Vec<Option<usize>>{
+    pub fn cells_mut(&mut self) -> &mut Vec<Option<usize>> {
         &mut self.cells
     }
 }
@@ -428,19 +464,23 @@ impl SudokuGrid {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Sudoku<C: Constraint + Clone> {
     grid: SudokuGrid,
-    constraint: C
+    constraint: C,
 }
 
 impl<C: Constraint + Clone> Sudoku<C> {
-    pub fn new_empty(block_width: usize, block_height: usize, constraint: C) -> SudokuResult<Sudoku<C>>{
-        Ok(Sudoku { grid: SudokuGrid::new(block_width, block_height)?, constraint})
+    pub fn new_empty(
+        block_width: usize,
+        block_height: usize,
+        constraint: C,
+    ) -> SudokuResult<Sudoku<C>> {
+        Ok(Sudoku {
+            grid: SudokuGrid::new(block_width, block_height)?,
+            constraint,
+        })
     }
 
-    pub fn new_with_grid(grid: SudokuGrid, constraint: C) -> Sudoku<C>{
-        Sudoku {
-            grid,
-            constraint
-        }
+    pub fn new_with_grid(grid: SudokuGrid, constraint: C) -> Sudoku<C> {
+        Sudoku { grid, constraint }
     }
 
     pub fn parse(code: &str, constraint: C) -> SudokuParseResult<Sudoku<C>> {
@@ -472,27 +512,26 @@ impl<C: Constraint + Clone> Sudoku<C> {
 
         if column >= size || row >= size {
             Err(SudokuError::OutOfBounds)
-        }
-        else {
+        } else {
             Ok(self.constraint.check_cell(&self.grid, column, row))
         }
     }
 
-    pub fn is_valid_number(&self,column: usize, row: usize, number: usize) -> SudokuResult<bool> {
+    pub fn is_valid_number(&self, column: usize, row: usize, number: usize) -> SudokuResult<bool> {
         let size = self.grid.size();
 
         if column >= size || row >= size {
             Err(SudokuError::OutOfBounds)
-        }
-        else if number == 0 || number > size {
+        } else if number == 0 || number > size {
             Err(SudokuError::InvalidNumber)
-        }
-        else {
-            Ok(self.constraint.check_number(&self.grid, column, row, number))
+        } else {
+            Ok(self
+                .constraint
+                .check_number(&self.grid, column, row, number))
         }
     }
 
-    pub fn is_valid_solution(&self, solution: &SudokuGrid) -> SudokuResult<bool>{
+    pub fn is_valid_solution(&self, solution: &SudokuGrid) -> SudokuResult<bool> {
         Ok(self.grid.is_subset(solution)? && self.constraint.check(solution) && solution.is_full())
     }
 
@@ -508,14 +547,14 @@ mod tests {
     use crate::constraint::DefaultConstraint;
 
     #[test]
-    fn parse_ok(){
+    fn parse_ok() {
         let grid_res = SudokuGrid::parse("2x2; 1,,,2, ,3,,4, ,2,,, 3,,,");
 
         if let Ok(grid) = grid_res {
             assert_eq!(2, grid.block_width());
             assert_eq!(2, grid.block_height());
             // first row, first cell
-            assert_eq!(Some(1), grid.get_cell(0,0).unwrap());
+            assert_eq!(Some(1), grid.get_cell(0, 0).unwrap());
             assert_eq!(None, grid.get_cell(1, 0).unwrap());
             // first row, second cell
             assert_eq!(None, grid.get_cell(2, 0).unwrap());
@@ -538,41 +577,61 @@ mod tests {
             // second row, fourth cell
             assert_eq!(None, grid.get_cell(2, 3).unwrap());
             assert_eq!(None, grid.get_cell(3, 3).unwrap());
-        }
-        else {
+        } else {
             panic!("Parsing valid grid failed.");
         }
     }
 
     #[test]
-    fn parse_malformed_dimensions(){
-        assert_eq!(Err(SudokuParseError::MalformedDimensions), SudokuGrid::parse("2x2x2;,,,,,,,,,,,,,,,"));
+    fn parse_malformed_dimensions() {
+        assert_eq!(
+            Err(SudokuParseError::MalformedDimensions),
+            SudokuGrid::parse("2x2x2;,,,,,,,,,,,,,,,")
+        );
     }
 
     #[test]
-    fn parse_invalid_dimensions(){
-        assert_eq!(Err(SudokuParseError::InvalidDimensions), SudokuGrid::parse("2x0;,"));
+    fn parse_invalid_dimensions() {
+        assert_eq!(
+            Err(SudokuParseError::InvalidDimensions),
+            SudokuGrid::parse("2x0;,")
+        );
     }
 
     #[test]
     fn parse_wrong_number_of_parts() {
-        assert_eq!(Err(SudokuParseError::WrongNumberOfParts), SudokuGrid::parse("2x2;,,,,,,,,,,,,,,,;whatever"));
+        assert_eq!(
+            Err(SudokuParseError::WrongNumberOfParts),
+            SudokuGrid::parse("2x2;,,,,,,,,,,,,,,,;whatever")
+        );
     }
 
     #[test]
     fn parse_number_format_error() {
-        assert_eq!(Err(SudokuParseError::NumberFormatError), SudokuGrid::parse("2x#;,"));
+        assert_eq!(
+            Err(SudokuParseError::NumberFormatError),
+            SudokuGrid::parse("2x#;,")
+        );
     }
 
     #[test]
     fn parse_invalid_number() {
-        assert_eq!(Err(SudokuParseError::InvalidNumber), SudokuGrid::parse("2x2;,,,4,,,5,,,,,,,,,"));
+        assert_eq!(
+            Err(SudokuParseError::InvalidNumber),
+            SudokuGrid::parse("2x2;,,,4,,,5,,,,,,,,,")
+        );
     }
 
     #[test]
     fn parse_wrong_number_of_cells() {
-        assert_eq!(Err(SudokuParseError::WrongNumberOfCells), SudokuGrid::parse("2x2;1,2,3,4,1,2,3,4,1,2,3,4,1,2,3"));
-        assert_eq!(Err(SudokuParseError::WrongNumberOfCells), SudokuGrid::parse("2x2;1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1"));
+        assert_eq!(
+            Err(SudokuParseError::WrongNumberOfCells),
+            SudokuGrid::parse("2x2;1,2,3,4,1,2,3,4,1,2,3,4,1,2,3")
+        );
+        assert_eq!(
+            Err(SudokuParseError::WrongNumberOfCells),
+            SudokuGrid::parse("2x2;1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1")
+        );
     }
 
     #[test]
@@ -586,8 +645,10 @@ mod tests {
         grid.set_cell(2, 2, 3).unwrap();
         grid.set_cell(3, 3, 4).unwrap();
 
-        assert_eq!("2x2;1,,,,,2,,,,,3,,,,,4",
-            grid.to_parseable_string().as_str());
+        assert_eq!(
+            "2x2;1,,,,,2,,,,,3,,,,,4",
+            grid.to_parseable_string().as_str()
+        );
 
         let grid = SudokuGrid::new(4, 1).unwrap();
 
@@ -608,8 +669,7 @@ mod tests {
     fn count_clues_and_empty_and_full() {
         let empty = SudokuGrid::parse("2x2;,,,,,,,,,,,,,,,").unwrap();
         let partial = SudokuGrid::parse("2x2;1,,3,2,4,,,,,,,,,,1,").unwrap();
-        let full = SudokuGrid::parse("2x2;2,3,4,1,1,4,2,3,4,1,3,2,3,2,1,4")
-            .unwrap();
+        let full = SudokuGrid::parse("2x2;2,3,4,1,1,4,2,3,4,1,3,2,3,2,1,4").unwrap();
 
         assert_eq!(0, empty.count_clues());
         assert_eq!(5, partial.count_clues());
@@ -647,8 +707,7 @@ mod tests {
     fn empty_is_subset() {
         let empty = SudokuGrid::new(2, 2).unwrap();
         let non_empty = SudokuGrid::parse("2x2;1,,,,,,,,,,,,,,,").unwrap();
-        let full = SudokuGrid::parse("2x2;1,2,3,4,3,4,1,2,2,3,1,4,4,1,3,2")
-            .unwrap();
+        let full = SudokuGrid::parse("2x2;1,2,3,4,3,4,1,2,2,3,1,4,4,1,3,2").unwrap();
 
         assert_equal_set(&empty, &empty);
         assert_true_subset(&empty, &non_empty);
@@ -677,71 +736,88 @@ mod tests {
     }
 
     fn solution_example_sudoku() -> Sudoku<DefaultConstraint> {
-        Sudoku::parse("2x2;\
+        Sudoku::parse(
+            "2x2;\
             2, , , ,\
              , ,3, ,\
              , , ,4,\
-             ,2, , ", DefaultConstraint).unwrap()
+             ,2, , ",
+            DefaultConstraint,
+        )
+        .unwrap()
     }
 
     #[test]
     fn solution_not_full() {
         let sudoku = solution_example_sudoku();
-        let solution = SudokuGrid::parse("2x2;\
+        let solution = SudokuGrid::parse(
+            "2x2;\
             2,3,4,1,\
             1,4,3, ,\
             3,1,2,4,\
-            4,2,1,3").unwrap();
+            4,2,1,3",
+        )
+        .unwrap();
         assert!(!sudoku.is_valid_solution(&solution).unwrap());
     }
 
     #[test]
     fn solution_not_superset() {
         let sudoku = solution_example_sudoku();
-        let solution = SudokuGrid::parse("2x2;\
+        let solution = SudokuGrid::parse(
+            "2x2;\
             2,3,4,1,\
             1,4,3,2,\
             3,2,1,4,\
-            4,1,2,3").unwrap();
+            4,1,2,3",
+        )
+        .unwrap();
         assert!(!sudoku.is_valid_solution(&solution).unwrap());
     }
 
     #[test]
     fn solution_violates_constraint() {
         let sudoku = solution_example_sudoku();
-        let solution = SudokuGrid::parse("2x2;\
+        let solution = SudokuGrid::parse(
+            "2x2;\
             2,3,4,1,\
             1,3,3,2,\
             3,1,2,4,\
-            4,2,1,3").unwrap();
+            4,2,1,3",
+        )
+        .unwrap();
         assert!(!sudoku.is_valid_solution(&solution).unwrap());
     }
 
     #[test]
     fn solution_correct() {
         let sudoku = solution_example_sudoku();
-        let solution = SudokuGrid::parse("2x2;\
+        let solution = SudokuGrid::parse(
+            "2x2;\
             2,3,4,1,\
             1,4,3,2,\
             3,1,2,4,\
-            4,2,1,3").unwrap();
+            4,2,1,3",
+        )
+        .unwrap();
         assert!(sudoku.is_valid_solution(&solution).unwrap());
     }
 
     #[test]
     fn sudoku_grid_serde_consistent() {
-        let grid = SudokuGrid::parse("3x2;\
+        let grid = SudokuGrid::parse(
+            "3x2;\
             1, ,3, ,5, ,\
              ,2, ,4, ,6,\
             3, ,5, ,1, ,\
              ,4, ,6, ,2,\
             5, ,1, ,3, ,\
-             ,6, ,2, ,4").unwrap();
+             ,6, ,2, ,4",
+        )
+        .unwrap();
         let json = serde_json::to_string(&grid).unwrap();
-        let reconstructed_grid: SudokuGrid =
-            serde_json::from_str(&json).unwrap();
+        let reconstructed_grid: SudokuGrid = serde_json::from_str(&json).unwrap();
 
         assert_eq!(grid, reconstructed_grid);
     }
-
 }
