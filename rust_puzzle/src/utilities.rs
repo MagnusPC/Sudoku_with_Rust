@@ -3,9 +3,8 @@ use std::hash::Hash;
 use std::ops::{
     BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Sub, SubAssign,
 };
-use std::ptr::with_exposed_provenance;
+
 use std::slice::Iter;
-use std::{iter, mem};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct USizeSet {
@@ -85,7 +84,7 @@ impl<'a> USizeSetIter<'a> {
     }
 }
 
-const U64_BIT_SIZE: usize = mem::size_of::<u64>() * 8;
+const U64_BIT_SIZE: usize = size_of::<u64>() * 8;
 
 impl<'a> Iterator for USizeSetIter<'a> {
     type Item = usize;
